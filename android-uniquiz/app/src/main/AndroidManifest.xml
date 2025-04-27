@@ -8,9 +8,9 @@
   <application
 
         android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/quiz"
         android:label="Uniquiz"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:roundIcon="@mipmap/quiz"
         android:supportsRtl="true"
         android:theme="@android:style/Theme">
         <activity
