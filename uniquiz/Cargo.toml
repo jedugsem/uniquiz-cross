@@ -1,0 +1,61 @@
+[package]
+name = "uniquiz"
+version = "0.1.0"
+edition = "2021"
+default-run="uniquiz"
+
+[[bin]]
+name = "uniquiz"
+path = "src/main.rs"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+webbrowser = "*"
+iced-material = {workspace=true}
+substring = "*"
+bincode = {version = "1.3.3"}
+dirs = "*"
+ron = "*"
+serde = {features = ["derive"],version="*"}
+quizlib = {workspace=true}
+chrono = "*"
+sys-locale = "*"
+
+futures ="*"
+tokio = "*"
+reqwest = {version="*",default-features=false,features=["blocking","rustls-tls"]}
+[dependencies.iced]
+#git = "https://github.com/ibaryshnikov/iced.git"
+#rev = "901bbeb"
+features = ["wgpu","tokio"]
+path = "../../iced/"
+
+[dependencies.iced_widget]
+#git = "https://github.com/ibaryshnikov/iced.git"
+#rev = "901bbeb"
+features = ["wgpu"]
+path = "../../iced/widget"
+
+[dependencies.iced_graphics]
+#git = "https://github.com/ibaryshnikov/iced.git"
+#rev = "901bbeb"
+path = "../../iced/graphics"
+
+
+[dependencies.iced_winit]
+#git = "https://github.com/ibaryshnikov/iced.git"
+#rev = "901bbeb"
+path = "../../iced/winit"
+
+[dependencies.iced_wgpu]
+#git = "https://github.com/ibaryshnikov/iced.git"
+#rev = "901bbeb"
+path = "../../iced/wgpu"
+
+[dependencies.iced_core]
+#git = "https://github.com/ibaryshnikov/iced.git"
+#rev = "901bbeb"
+path = "../../iced/core"
+

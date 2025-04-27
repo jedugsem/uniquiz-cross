@@ -1,0 +1,17 @@
+[workspace]
+members = ["uniquiz","parser/jagdschein", "quizlib", "parser/convert"]
+default-members = ["uniquiz","parser/jagdschein"]
+resolver = "2"
+exclude = ["android-uniquiz"]
+
+[workspace.package]
+version = "0.3.1"
+authors = ["Jedug Sem"]
+edition = "2021"
+repository = "https://gitlab.com/jedugsem/uniquiz"
+readme = "README.md"
+
+[workspace.dependencies]
+quizlib = { path = "quizlib" }
+iced-material = { path = "../iced-material" }
+
