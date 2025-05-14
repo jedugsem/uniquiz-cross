@@ -116,6 +116,8 @@ impl Default for Uniquiz {
 }
 #[derive(Debug, Clone)]
 pub enum Message {
+    Boot,
+    Clipboard(String, u8),
     Select(u8),
     Side,
     Back,
@@ -153,6 +155,22 @@ impl Controls {
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::Boot => {
+                //
+                Com::none()
+            }
+            Message::Clipboard(m, n) => {
+                match n {
+                    0 => self
+                        .editor
+                        .perform(text_editor::Action::Edit(text_editor::Edit::Paste(
+                            Arc::new(m),
+                        ))),
+                    _ => {}
+                }
+                Com::none()
+            }
+
             Message::EditorAction(action) => match action {
                 text_editor::Action::Click(_) => {
                     #[cfg(target_os = "android")]
@@ -362,6 +380,9 @@ mod android {
     pub use iced_winit::winit::event_loop::EventLoopProxy;
     #[derive(Debug)]
     pub enum UserEvent {
+        ClipboardRead(u8),
+        ClipboardWrite(String),
+
         ShowKeyboard,
         Task(Message),
         HideKeyboard,

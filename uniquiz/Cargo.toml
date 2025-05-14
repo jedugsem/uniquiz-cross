@@ -12,6 +12,8 @@ path = "src/main.rs"
 path = "src/lib.rs"
 
 [dependencies]
+url = "*"
+git2 = {version="0.13.22", features = ["vendored-libgit2","vendored-openssl"]}
 webbrowser = "*"
 iced-material = {workspace=true}
 substring = "*"

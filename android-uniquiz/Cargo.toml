@@ -20,27 +20,19 @@ futures = "0.3"
 android-intent = "*"
 
 [dependencies.iced_core]
-#git = "https://github.com/ibaryshnikov/iced.git"
-#rev = "901bbeb"
-path = "../../iced/core"
+git = "https://github.com/jedugsem/iced"
 features = []
 default-features =false
 
 [dependencies.iced_widget]
-#git = "https://github.com/ibaryshnikov/iced.git"
-#rev = "901bbeb"
-path = "../../iced/widget"
+git = "https://github.com/jedugsem/iced"
 features = ["wgpu"]
 
 [dependencies.iced_winit]
-#git = "https://github.com/ibaryshnikov/iced.git"
-#rev = "901bbeb"
-path = "../../iced/winit"
+git = "https://github.com/jedugsem/iced"
 
 [dependencies.iced_wgpu]
-#git = "https://github.com/ibaryshnikov/iced.git"
-#rev = "901bbeb"
-path = "../../iced/wgpu"
+git = "https://github.com/jedugsem/iced"
 
 [patch.crates-io]
 softbuffer = { git = "https://github.com/MarijnS95/softbuffer.git", rev = "d5cc95a" } # branch = "android"

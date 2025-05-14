@@ -10,6 +10,8 @@ use crate::winit::keyboard::NamedKey;
 use crate::winit::keyboard::PhysicalKey;
 use crate::winit::platform::android::activity::AndroidApp;
 use clipboard::Clipboard;
+use iced_core::clipboard::Kind;
+use iced_core::Clipboard as ClipInterface;
 use iced_wgpu::graphics::Viewport;
 use iced_wgpu::{wgpu, Engine, Renderer};
 use iced_winit::conversion;
@@ -25,8 +27,7 @@ use iced_winit::winit::platform::android::EventLoopBuilderExtAndroid;
 use log::LevelFilter;
 use scene::Scene;
 use std::sync::Arc;
-use uniquiz::Uniquiz;
-use uniquiz::{Controls, UserEvent};
+use uniquiz::{Controls, Message, UserEvent};
 use winit::{
     event::WindowEvent,
     event_loop::{ControlFlow, EventLoop},
@@ -56,29 +57,37 @@ fn android_main(android_app: AndroidApp) {
     event_loop
         .run_app(&mut runner)
         .expect("Should run event loop");
+    android_intent::with_current_env(|env| {
+        android_intent::Intent::new(env, "Settings.ACTION_MANAGE_APP_ALL_FILE_ACCES_PERMISSION")
+            .with_type("android.intent.category.DEFAULT")
+            .with_extra(android_intent::Extra::Text, "package:com.jedugsem.uniquiz")
+            .start_activity()
+            .unwrap()
+    });
 }
 
 #[allow(clippy::large_enum_variant)]
 enum Runner {
     Loading(EventLoopProxy<UserEvent>),
-    Ready {
-        proxy: EventLoopProxy<UserEvent>,
-        window: Arc<winit::window::Window>,
-        queue: wgpu::Queue,
-        device: wgpu::Device,
-        surface: wgpu::Surface<'static>,
-        format: wgpu::TextureFormat,
-        renderer: Renderer,
-        scene: Scene,
-        controls: Controls,
-        events: Vec<Event>,
-        cursor: mouse::Cursor,
-        cache: user_interface::Cache,
-        clipboard: Clipboard,
-        viewport: Viewport,
-        modifiers: ModifiersState,
-        resized: bool,
-    },
+    Ready(Ready),
+}
+struct Ready {
+    proxy: EventLoopProxy<UserEvent>,
+    window: Arc<winit::window::Window>,
+    queue: wgpu::Queue,
+    device: wgpu::Device,
+    surface: wgpu::Surface<'static>,
+    format: wgpu::TextureFormat,
+    renderer: Renderer,
+    scene: Scene,
+    controls: Controls,
+    events: Vec<Event>,
+    cursor: mouse::Cursor,
+    cache: user_interface::Cache,
+    clipboard: Clipboard,
+    viewport: Viewport,
+    modifiers: ModifiersState,
+    resized: bool,
 }
 
 impl winit::application::ApplicationHandler<UserEvent> for Runner {
@@ -91,33 +100,56 @@ impl winit::application::ApplicationHandler<UserEvent> for Runner {
                 java::call_instance_method("hideKeyboard");
             }
             UserEvent::Back => {
-                if let Runner::Ready {
+                if let Runner::Ready(Ready {
                     controls, window, ..
-                } = self
+                }) = self
                 {
-                    controls.update(uniquiz::Message::Back);
+                    _ = controls.update(Message::Back);
                     window.request_redraw();
                 }
             }
             UserEvent::Task(message) => {
-                if let Runner::Ready {
+                if let Runner::Ready(Ready {
                     controls, window, ..
-                } = self
+                }) = self
                 {
-                    controls.update(message);
+                    _ = controls.update(message);
                     window.request_redraw();
+                }
+            }
+            UserEvent::ClipboardWrite(m) => {
+                if let Runner::Ready(Ready {
+                    clipboard, window, ..
+                }) = self
+                {
+                    clipboard.write(Kind::Standard, m);
+                    window.request_redraw();
+                }
+            }
+            UserEvent::ClipboardRead(num) => {
+                if let Runner::Ready(Ready {
+                    controls,
+                    window,
+                    clipboard,
+                    ..
+                }) = self
+                {
+                    if let Some(m) = clipboard.read(Kind::Standard) {
+                        _ = controls.update(Message::Clipboard(m, num));
+                        window.request_redraw();
+                    }
                 }
             }
         }
     }
 
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        let (proxy, controls) = match self {
-            Self::Loading(proxy) => (proxy.clone(), Controls::new(proxy.clone())),
-            Self::Ready {
-                proxy, controls, ..
-            } => (proxy.clone(), controls.clone()),
-        };
+        // let (proxy, controls) = match self {
+        //     Self::Loading(proxy) => (proxy.clone(), Controls::new(proxy.clone())),
+        //     Self::Ready {
+        //         proxy, controls, ..
+        //     } => (proxy.clone(), controls.clone()),
+        // };
         let window = Arc::new(
             event_loop
                 .create_window(winit::window::WindowAttributes::default())
@@ -206,25 +238,51 @@ impl winit::application::ApplicationHandler<UserEvent> for Runner {
 
         // You should change this if you want to render continuously
         event_loop.set_control_flow(ControlFlow::Wait);
-
-        *self = Self::Ready {
-            proxy: proxy.clone(),
-            window,
-            device,
-            queue,
-            renderer,
-            surface,
-            format,
-            scene,
-            controls,
-            events: Vec::new(),
-            cursor: mouse::Cursor::Unavailable,
-            modifiers: ModifiersState::default(),
-            cache: user_interface::Cache::new(),
-            clipboard,
-            viewport,
-            resized: false,
-        };
+        match self {
+            Self::Ready(ready) => {
+                ready.window = window;
+                ready.device = device;
+                ready.queue = queue;
+                ready.renderer = renderer;
+                ready.surface = surface;
+                ready.format = format;
+                ready.scene = scene;
+                ready.events = Vec::new();
+                ready.cursor = mouse::Cursor::Unavailable;
+                ready.modifiers = ModifiersState::default();
+                ready.cache = user_interface::Cache::new();
+                ready.clipboard = clipboard;
+                ready.viewport = viewport;
+                ready.resized = false;
+            }
+            Self::Loading(proxy) => {
+                *self = Self::Ready(Ready {
+                    proxy: proxy.clone(),
+                    window,
+                    device,
+                    queue,
+                    renderer,
+                    surface,
+                    format,
+                    scene,
+                    controls: Controls::new(proxy.clone()),
+                    events: Vec::new(),
+                    cursor: mouse::Cursor::Unavailable,
+                    modifiers: ModifiersState::default(),
+                    cache: user_interface::Cache::new(),
+                    clipboard,
+                    viewport,
+                    resized: false,
+                });
+            }
+        }
+        if let Runner::Ready(Ready {
+            controls, window, ..
+        }) = self
+        {
+            _ = controls.update(Message::Boot);
+            window.request_redraw();
+        }
     }
 
     fn window_event(
@@ -233,7 +291,7 @@ impl winit::application::ApplicationHandler<UserEvent> for Runner {
         _window_id: winit::window::WindowId,
         event: WindowEvent,
     ) {
-        let Self::Ready {
+        let Self::Ready(Ready {
             proxy,
             window,
             device,
@@ -250,7 +308,7 @@ impl winit::application::ApplicationHandler<UserEvent> for Runner {
             clipboard,
             cache,
             resized,
-        } = self
+        }) = self
         else {
             return;
         };
@@ -372,14 +430,14 @@ impl winit::application::ApplicationHandler<UserEvent> for Runner {
             } => {
                 match event.logical_key {
                     winit::keyboard::Key::Named(NamedKey::GoBack) => {
-                        proxy.send_event(UserEvent::Back);
+                        _ = proxy.send_event(UserEvent::Back);
                     }
                     _ => {}
                 }
                 if let PhysicalKey::Code(code) = event.physical_key {
                     match code {
                         KeyCode::BrowserBack => {
-                            proxy.send_event(UserEvent::Back);
+                            _ = proxy.send_event(UserEvent::Back);
                         }
                         KeyCode::ShiftLeft | KeyCode::ShiftRight => match event.state {
                             ElementState::Pressed => *modifiers |= ModifiersState::SHIFT,
@@ -430,7 +488,7 @@ impl winit::application::ApplicationHandler<UserEvent> for Runner {
 
             // update our UI with any messages
             for message in messages {
-                controls.update(message);
+                _ = controls.update(message);
             }
 
             // and request a redraw

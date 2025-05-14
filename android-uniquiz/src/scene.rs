@@ -1,4 +1,4 @@
-use iced_wgpu::wgpu::{self, PipelineCache};
+use iced_wgpu::wgpu;
 use iced_winit::core::Color;
 
 pub struct Scene {
