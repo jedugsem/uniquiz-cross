@@ -29,33 +29,40 @@ reqwest = {version="*",default-features=false,features=["blocking","rustls-tls"]
 [dependencies.iced]
 #git = "https://github.com/ibaryshnikov/iced.git"
 #rev = "901bbeb"
+git = "https://github.com/jedugsem/iced"
 features = ["wgpu","tokio"]
-path = "../../iced/"
 
 [dependencies.iced_widget]
 #git = "https://github.com/ibaryshnikov/iced.git"
 #rev = "901bbeb"
 features = ["wgpu"]
-path = "../../iced/widget"
+git = "https://github.com/jedugsem/iced"
 
 [dependencies.iced_graphics]
 #git = "https://github.com/ibaryshnikov/iced.git"
 #rev = "901bbeb"
-path = "../../iced/graphics"
+git = "https://github.com/jedugsem/iced"
 
 
 [dependencies.iced_winit]
 #git = "https://github.com/ibaryshnikov/iced.git"
 #rev = "901bbeb"
-path = "../../iced/winit"
+git = "https://github.com/jedugsem/iced"
 
 [dependencies.iced_wgpu]
 #git = "https://github.com/ibaryshnikov/iced.git"
+git = "https://github.com/jedugsem/iced"
 #rev = "901bbeb"
-path = "../../iced/wgpu"
 
 [dependencies.iced_core]
+git = "https://github.com/jedugsem/iced"
 #git = "https://github.com/ibaryshnikov/iced.git"
 #rev = "901bbeb"
-path = "../../iced/core"
 
+
+#
+# [profile.release]
+# strip= true
+# lto =true
+# opt-level = "z"
+# panic="abort"

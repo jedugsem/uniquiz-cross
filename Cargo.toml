@@ -13,5 +13,5 @@ readme = "README.md"
 
 [workspace.dependencies]
 quizlib = { path = "quizlib" }
-iced-material = { path = "../iced-material" }
+iced-material = { git = "https://github.com/jedugsem/iced-material" }
 

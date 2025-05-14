@@ -1,0 +1,4 @@
+target/*
+android-uniquiz/target/*
+android-uniquiz/.idea/*
+android-uniquiz/app/src/main/jniLibs/arm64-v8a/libuniquiz.so
