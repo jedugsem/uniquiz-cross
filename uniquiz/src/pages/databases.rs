@@ -1,5 +1,3 @@
-use std::{fs::File, path::PathBuf};
-
 use crate::{fl, per::*, Controls, Element, Load, Loaded, Message};
 use iced::{
     widget::{button, column, row, scrollable, text, Space},
@@ -25,7 +23,6 @@ impl From<DbM> for Message {
         Message::Db(m)
     }
 }
-use std::io::Read;
 impl Controls {
     pub fn view_load(&self) -> Element<Message> {
         if let Load {

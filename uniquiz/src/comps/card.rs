@@ -6,7 +6,7 @@ use crate::{fl, pages::katselect::SelectState, per::Com, Controls, Element, Load
 use iced::Alignment::Center;
 use iced::Length::Fill;
 use iced::{
-    widget::{button, column, container, row, scrollable, svg, text, Space},
+    widget::{button, column, container, row, scrollable, text, Space},
     Alignment, Length, Task,
 };
 use iced_material::{icon, theme};
@@ -152,7 +152,7 @@ impl Controls {
                         Com::save(&self)
                     }
                     CardM::Next(errors) => {
-                        let data = format!("hey {}", tab);
+                        let _data = format!("hey {}", tab);
 
                         match tab {
                             4 => match test {
@@ -263,10 +263,11 @@ impl Controls {
         }
     }
     fn write_progress(&self, prog: TSafe, path: PathBuf) -> Task<Message> {
+        let git = self.state.settings.prog_git.clone();
         Com::perform(
             &self,
             async move {
-                crate::per::write_progress(&prog, path);
+                crate::per::write_progress(git, &prog, path).await;
             },
             |_| Message::Nothing,
         )

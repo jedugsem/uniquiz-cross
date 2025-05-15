@@ -1,15 +1,23 @@
 use iced_winit::futures::MaybeSend;
 use quizlib::*;
 use ron::{de::from_reader, ser::PrettyConfig};
-use std::{fs::remove_file, path::PathBuf};
+use std::path::PathBuf;
 
-use crate::{settings::PSettings, Controls, Uniquiz};
-use std::io::Write;
+use crate::{dir, git, Repos};
+use crate::{settings::PSettings, Controls};
 use std::{fs::File, io::Read};
+
+pub async fn update(repos: Repos) {
+    for i in repos.repos {
+        if !dir().join(i.path.clone()).exists() {
+            _ = git::clone(i).await;
+        }
+    }
+}
 
 pub struct Com;
 impl Com {
-    pub fn save(controls: &Controls) -> iced::Task<crate::Message> {
+    pub fn save(_controls: &Controls) -> iced::Task<crate::Message> {
         // #[cfg(target_os = "android")]
         // {
         //     let uniquiz = controls.state.clone();
@@ -84,7 +92,11 @@ impl Com {
 //     }
 // }
 //
-pub fn load_progress(path: PathBuf) -> Result<TSafe, String> {
+use crate::GitRepo;
+pub fn load_progress(path1: PathBuf) -> Result<TSafe, String> {
+    let last = path1.iter().last().unwrap();
+    let path = dir().join("progress").join(last);
+
     match std::fs::File::open(path.join(".process")) {
         Ok(file) => {
             let mut buf_reader = std::io::BufReader::new(file);
@@ -101,41 +113,36 @@ pub fn load_progress(path: PathBuf) -> Result<TSafe, String> {
     }
 }
 pub fn load_settings() -> Result<crate::settings::PSettings, String> {
-    #[cfg(not(target_os = "android"))]
-    let path = dirs::data_local_dir().unwrap().join("uniquiz");
-    #[cfg(target_os = "android")]
-    let path = PathBuf::from("/storage/emulated/0/git/").join("uniquiz");
-    match std::fs::File::open(path.join("config.ron")) {
+    match std::fs::File::open(dir().join("config.ron")) {
         Ok(file) => Ok(from_reader(file).unwrap_or(PSettings::default())),
         _ => Err("".to_string()),
     }
 }
-pub fn write_progress(progress: &TSafe, path: PathBuf) {
+pub async fn write_progress(git: Option<GitRepo>, progress: &TSafe, path1: PathBuf) {
     //
+    let last = path1.iter().last().unwrap();
+    let path = dir().join("progress").join(last);
+    if !path.exists() {
+        _ = std::fs::create_dir_all(&path);
+    }
 
     let file = File::create(path.join(".process")).unwrap();
-    ron::Options::default().to_io_writer_pretty(file, progress, PrettyConfig::default());
+    _ = ron::Options::default().to_io_writer_pretty(file, progress, PrettyConfig::default());
+    if let Some(git) = git {
+        _ = git::add(git.clone()).await;
+        _ = git::commit(git.clone(), "progress").await;
+        _ = git::push(git).await;
+    }
 }
 pub fn write_settings(settings: crate::settings::PSettings) {
-    #[cfg(not(target_os = "android"))]
-    let path = dirs::data_local_dir().unwrap().join("uniquiz");
-    #[cfg(target_os = "android")]
-    let path = PathBuf::from("/storage/emulated/0/git").join("uniquiz");
-    let mut file = File::create(path.join("config.ron")).unwrap();
+    let mut file = File::create(dir().join("config.ron")).unwrap();
     let _ =
         ron::Options::default().to_io_writer_pretty(&mut file, &settings, PrettyConfig::default());
     //println!("Settings writtem");
 }
 
 pub fn get_modules() -> Result<Vec<Modul>, String> {
-    let path = vec![
-        #[cfg(not(target_os = "android"))]
-        PathBuf::from("/usr/share").join("uniquiz/modules"),
-        #[cfg(not(target_os = "android"))]
-        dirs::data_local_dir().unwrap().join("uniquiz/modules"),
-        #[cfg(target_os = "android")]
-        PathBuf::from("/storage/emulated/0/git").join("uniquiz/modules"),
-    ];
+    let path = vec![dir().join("modules")];
     match read_dirs(path) {
         Ok(t) => Ok(t),
         Err(err) => Result::Err(format!("{:?}", err)),

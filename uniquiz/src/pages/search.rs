@@ -1,5 +1,5 @@
 use iced::{
-    widget::{button, column, scrollable, text, text_editor},
+    widget::{button, column, scrollable, text},
     Length, Task,
 };
 use iced_widget::container;
@@ -12,6 +12,7 @@ use super::stepbystep::PSafe;
 
 #[derive(Debug, Clone)]
 pub enum SearchM {
+    Paste,
     Init,
     Selectt(usize),
     Search(String),
@@ -39,6 +40,14 @@ impl Controls {
                 search: Some(search),
                 ..
             }) => match m {
+                SearchM::Paste => {
+                    #[cfg(target_os = "android")]
+                    {
+                        _ = self.proxy.send_event(crate::UserEvent::ClipboardRead(0));
+                    }
+
+                    Com::none()
+                }
                 SearchM::Search(m) => {
                     search.search = m.trim().to_string();
                     Com::save(&self)
@@ -124,8 +133,12 @@ impl Controls {
                             scrollable(column(coo).padding(10).spacing(10)).into()
                         };
                         column!(
-                            container(searchbar(&self.editor, Message::EditorAction))
-                                .center_x(Length::Fill),
+                            container(searchbar(
+                                &self.editor,
+                                |x| Message::EditorAction(x, 0),
+                                Some(|| SearchM::Paste.into()),
+                            ))
+                            .center_x(Length::Fill),
                             w
                         )
                         .padding(10)

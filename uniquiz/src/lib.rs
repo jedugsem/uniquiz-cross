@@ -1,14 +1,25 @@
 #![allow(unreachable_code)]
 
+use std::path::PathBuf;
 use std::sync::Arc;
-
+pub fn dir() -> PathBuf {
+    #[cfg(target_os = "android")]
+    {
+        PathBuf::from("/storage/emulated/0/.uni/uniquiz")
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        PathBuf::from("/home/me/.local/share/uniquiz")
+    }
+}
+use git::GitRepo;
 #[cfg(not(target_os = "android"))]
 pub use iced::Renderer;
-use iced_graphics::text::cosmic_text::{fontdb::Source, Attrs};
-use ron::de::from_bytes;
+use ron::de::{from_bytes, from_reader};
 use serde::{Deserialize, Serialize};
 pub mod back;
 pub mod comps;
+pub mod git;
 pub mod localize;
 mod pages;
 pub mod per;
@@ -31,19 +42,24 @@ use pages::{
 };
 use per::Com;
 use quizlib::{Db, Modul};
-use settings::{Language, PSettings, SettingsM, Them};
+use settings::{PSettings, Settings, SettingsM, Them};
 //use sys_locale::get_locale;
 pub type Element<'a, Message> = iced::Element<'a, Message, theme::Theme, Renderer>;
 // State Top Down
+#[derive(Debug, Clone, Serialize, Default, Deserialize)]
+pub struct Repos {
+    repos: Vec<GitRepo>,
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Uniquiz {
+    pub mo: Repos,
+    pub sett: Settings,
     // Pages - Optional
     pub modules: Load,
     // Window
     pub window: Window,
     // Sidebar
     pub loaded: Option<Loaded>,
-
     // Settings
     pub settings: PSettings,
     // Loading - Modules
@@ -101,6 +117,8 @@ impl Default for Uniquiz {
         };
 
         Self {
+            mo: Repos::default(),
+            sett: Settings::Normal,
             // Window
             // Sidebar
             loaded: None,
@@ -117,13 +135,15 @@ impl Default for Uniquiz {
 #[derive(Debug, Clone)]
 pub enum Message {
     Boot,
+    CheckMissingModule,
     Clipboard(String, u8),
     Select(u8),
     Side,
+    LoadMods,
     Back,
     Exit,
     Nothing,
-    EditorAction(text_editor::Action),
+    EditorAction(text_editor::Action, usize),
     ToggleSettings,
     Settings(SettingsM),
     Card(CardM),
@@ -135,19 +155,7 @@ pub enum Message {
     Search(SearchM),
 }
 const BREAKPOINT: f32 = 500.;
-impl Clone for Controls {
-    fn clone(&self) -> Self {
-        Controls {
-            editor: text_editor::Content::new(),
-            theme: self.theme.clone(),
-            state: self.state.clone(),
-            #[cfg(target_os = "android")]
-            background_color: self.background_color.clone(),
-            #[cfg(target_os = "android")]
-            proxy: self.proxy.clone(),
-        }
-    }
-}
+
 impl Controls {
     pub fn title(&self) -> String {
         "Uniquiz".to_string()
@@ -155,10 +163,90 @@ impl Controls {
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::Boot => {
-                //
+            Message::LoadMods => {
+                self.state.modules.modules = match per::get_modules() {
+                    Ok(ok) => Some(ok),
+                    Err(_err) => None,
+                };
                 Com::none()
             }
+            Message::Boot => {
+                if !dir().join("progress").exists() {
+                    self.state.sett = Settings::Prog;
+                    self.state.window.settings_open = true;
+                    Com::none()
+
+                    // Update git
+                } else {
+                    if let Some(prog) = &self.state.settings.prog_git {
+                        let git = prog.clone();
+                        Com::perform(
+                            &self,
+                            async move {
+                                _ = git::pull(git).await;
+                                Message::CheckMissingModule
+                            },
+                            |x| x,
+                        )
+                    } else {
+                        Com::perform(&self, async move { Message::CheckMissingModule }, |x| x)
+                    }
+                }
+            }
+            Message::CheckMissingModule => {
+                if !dir().join("modules").exists() {
+                    let path = dir().join("progress").join("modules.ron");
+                    if path.exists() {
+                        if let Ok(file) = std::fs::File::open(path) {
+                            if let Ok(mods) = from_reader(file) {
+                                self.state.mo = mods;
+                            }
+                        }
+                    }
+                    let repos = self.state.mo.clone();
+                    if !self.state.mo.repos.is_empty() {
+                        Com::perform(
+                            &self,
+                            async move {
+                                per::update(repos).await;
+                                Message::LoadMods
+                            },
+                            |x| x,
+                        )
+                    } else {
+                        self.state.sett = Settings::Repos;
+                        self.state.window.settings_open = true;
+                        Com::none()
+                    }
+                    // Update git
+                } else {
+                    let path = dir().join("progress").join("modules.ron");
+                    if path.exists() {
+                        if let Ok(file) = std::fs::File::open(path) {
+                            if let Ok(mods) = from_reader(file) {
+                                self.state.mo = mods;
+                            }
+                        }
+                    }
+                    let repos = self.state.mo.clone();
+
+                    self.state.window.settings_open = false;
+                    self.state.sett = Settings::Normal;
+                    if !self.state.mo.repos.is_empty() {
+                        Com::perform(
+                            &self,
+                            async move {
+                                per::update(repos).await;
+                                Message::LoadMods
+                            },
+                            |x| x,
+                        )
+                    } else {
+                        Com::none()
+                    }
+                }
+            }
+
             Message::Clipboard(m, n) => {
                 match n {
                     0 => self
@@ -166,12 +254,18 @@ impl Controls {
                         .perform(text_editor::Action::Edit(text_editor::Edit::Paste(
                             Arc::new(m),
                         ))),
+                    1 => self.prog_editor.perform(text_editor::Action::Edit(
+                        text_editor::Edit::Paste(Arc::new(m)),
+                    )),
+                    2 => self.ssh_editor.perform(text_editor::Action::Edit(
+                        text_editor::Edit::Paste(Arc::new(m)),
+                    )),
                     _ => {}
                 }
                 Com::none()
             }
 
-            Message::EditorAction(action) => match action {
+            Message::EditorAction(action, num) => match action {
                 text_editor::Action::Click(_) => {
                     #[cfg(target_os = "android")]
                     let _ = self.proxy.send_event(crate::UserEvent::ShowKeyboard);
@@ -183,26 +277,37 @@ impl Controls {
                     Com::none()
                 }
                 text_editor::Action::Edit(_) => {
-                    if let Some(Loaded {
-                        search: Some(_search),
-                        ..
-                    }) = &mut self.state.loaded
-                    {
-                        self.editor.perform(action);
-                        let text = self.editor.text();
-                        Com::perform(&self, async move { text }, |x| SearchM::Search(x).into())
-                    } else {
-                        Com::save(&self)
+                    println!("edit");
+                    match num {
+                        0 => {
+                            self.editor.perform(action);
+                            let text = self.editor.text();
+                            Com::perform(&self, async move { text }, |x| SearchM::Search(x).into())
+                        }
+                        1 => {
+                            self.prog_editor.perform(action);
+                            Com::none()
+                        }
+                        2 => {
+                            self.ssh_editor.perform(action);
+                            Com::none()
+                        }
+                        _ => Com::none(),
                     }
                 }
 
                 other => {
-                    if let Some(Loaded {
-                        search: Some(_search),
-                        ..
-                    }) = &mut self.state.loaded
-                    {
-                        self.editor.perform(other);
+                    match num {
+                        0 => {
+                            self.editor.perform(other);
+                        }
+                        1 => {
+                            self.prog_editor.perform(other);
+                        }
+                        2 => {
+                            self.ssh_editor.perform(other);
+                        }
+                        _ => {}
                     }
                     Com::none()
                 }
@@ -228,9 +333,26 @@ impl Controls {
                 Com::save(&self)
             }
             Message::Back => {
-                //
-                let m = back_message(self.state.window.tab);
-                Com::perform(&self, async move { m }, |x| x)
+                if self.state.window.settings_open {
+                    match self.state.sett {
+                        Settings::Prog => {
+                            self.state.sett = Settings::Manage;
+                        }
+                        Settings::Repos => {
+                            self.state.sett = Settings::Manage;
+                        }
+                        Settings::Manage => {
+                            self.state.sett = Settings::Normal;
+                        }
+                        Settings::Normal => {
+                            self.state.window.settings_open = false;
+                        }
+                    }
+                    Com::none()
+                } else {
+                    let m = back_message(self.state.window.tab);
+                    Com::perform(&self, async move { m }, |x| x)
+                }
             }
             Message::Exit => {
                 #[cfg(target_os = "android")]
@@ -392,6 +514,8 @@ mod android {
 #[cfg(target_os = "android")]
 pub use android::*;
 pub struct Controls {
+    pub prog_editor: text_editor::Content<crate::Renderer>,
+    pub ssh_editor: text_editor::Content<crate::Renderer>,
     pub editor: text_editor::Content<crate::Renderer>,
     pub theme: theme::Theme,
     pub state: Uniquiz,
@@ -415,6 +539,8 @@ impl Default for Controls {
             theme::Theme::default()
         };
         Self {
+            prog_editor: text_editor::Content::new(),
+            ssh_editor: text_editor::Content::new(),
             editor: text_editor::Content::new(),
             theme,
             state: Uniquiz::default(),
@@ -441,6 +567,8 @@ impl Controls {
         Controls {
             state,
             theme,
+            ssh_editor: text_editor::Content::new(),
+            prog_editor: text_editor::Content::new(),
             editor,
             background_color: Color::default(),
             proxy,

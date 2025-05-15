@@ -49,10 +49,12 @@ impl Controls {
                         let path = module.path.clone();
                         psafe.current = 0;
                         psafe.tsafe = TSafe::default();
+
+                        let git = self.state.settings.prog_git.clone();
                         Com::perform(
                             &self,
                             async {
-                                crate::per::write_progress(&TSafe::default(), path);
+                                crate::per::write_progress(git, &TSafe::default(), path).await;
                             },
                             |_| Message::Nothing,
                         )
