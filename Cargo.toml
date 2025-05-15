@@ -1,6 +1,6 @@
 [workspace]
-members = ["uniquiz","parser/jagdschein", "quizlib", "parser/convert"]
-default-members = ["uniquiz","parser/jagdschein"]
+members = ["uniquiz"]
+default-members = ["uniquiz"]
 resolver = "2"
 exclude = ["android-uniquiz"]
 
@@ -12,6 +12,6 @@ repository = "https://gitlab.com/jedugsem/uniquiz"
 readme = "README.md"
 
 [workspace.dependencies]
-quizlib = { path = "quizlib" }
+quizlib = { git = "https://github.com/jedugsem/quizlib" }
 iced-material = { git = "https://github.com/jedugsem/iced-material" }
 

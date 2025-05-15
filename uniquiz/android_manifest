@@ -1,5 +1,0 @@
-enable internet permissinions:
-"<uses-permission android:name="android.permission.INTERNET"/>"
-<application
-remove FullScreen and NoTitleBar
-
